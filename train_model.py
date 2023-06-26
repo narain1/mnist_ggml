@@ -42,14 +42,11 @@ for p, d, fs in os.walk(train_root):
     for f in fs:
         image_fs.append(os.path.join(p, f))
 
-print(len(image_fs))
-
 class ImgDataset(Dataset):
     def __init__(self, fs, fold=0, train=True):
         ys = list(map(lambda x: x.split('/')[-2], fs))
         kf = StratifiedKFold(4, random_state=32, shuffle=True)
         idx = list(kf.split(fs, ys))[fold][0 if train else 1]
-        print(idx)
         self.xs = [fs[i] for i in idx]
         self.ys = [ys[i] for i in idx]
 
@@ -61,14 +58,6 @@ class ImgDataset(Dataset):
     def __len__(self):
         return len(self.xs)
 
-train_ds, val_ds = ImgDataset(image_fs), ImgDataset(image_fs, train=False)
-train_dl, val_dl = (
-    DataLoader(train_ds, shuffle=True, drop_last=True, batch_size=64), 
-    DataLoader(val_ds, shuffle=False, batch_size=64)
-)
-
-print(len(train_ds), len(val_ds))
-print(len(train_dl), len(val_dl))
 
 class MnistModel(nn.Module):
     def __init__(self, inp_dim, out_dim):
@@ -83,9 +72,20 @@ class MnistModel(nn.Module):
         return self.l2(o)
 
 
+train_ds, val_ds = ImgDataset(image_fs), ImgDataset(image_fs, train=False)
+train_dl, val_dl = (
+    DataLoader(train_ds, shuffle=True, drop_last=True, batch_size=64), 
+    DataLoader(val_ds, shuffle=False, batch_size=64)
+)
+
+print(f'dataset length train : {len(train_ds)}, val: {len(val_ds)}')
+print(f'dataloader length train: {len(train_dl)}, val: {len(val_dl)}')
+
+
 model = MnistModel(784, 10)
 loss_fn = nn.CrossEntropyLoss()
 opt = Adam(model.parameters(), lr=1e-4)
+
 
 for _ in range(epochs):
     train_loss, val_loss = [], []
@@ -108,3 +108,7 @@ for _ in range(epochs):
             val_loss.append(loss.item())
 
     print(_, np.mean(train_loss), np.mean(val_loss), np.mean(train_acc), np.mean(val_acc))
+
+shutil.rmtree('temp')
+os.makedirs('models', exist_ok=True)
+torch.save(model.state_dict(), 'models/mnist.bin')
