@@ -8,6 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from PIL import Image
 from torch.optim import Adam
+import struct
 
 mnist_url = 'https://github.com/narain1/dotfiles/releases/download/data/mnist_png.zip'
 epochs = 5
@@ -29,7 +30,7 @@ def unzip_file(file_location):
     shutil.unpack_archive(file_location, image_root, 'zip')
     return image_root
 
-shutil.rmtree('temp')
+shutil.rmtree('temp', ignore_errors=True)
 p = download_file(mnist_url)
 img_loc = unzip_file(p)
 train_root = os.path.join(img_loc, 'training')
@@ -112,3 +113,23 @@ for _ in range(epochs):
 shutil.rmtree('temp')
 os.makedirs('models', exist_ok=True)
 torch.save(model.state_dict(), 'models/mnist.bin')
+
+state_dict = torch.load('models/mnist.bin', map_location='cpu')
+list_vars = state_dict
+
+with open('models/ggml_model.bin', 'wb') as f_out:
+    f_out.write(struct.pack('i', 0x67676d6c))
+
+    for name in list_vars.keys():
+        data = list_vars[name].squeeze().numpy()
+        print("processing variable: " + name + " with shape: ", data.shape)
+        n_dims = len(data.shape)
+        f_out.write(struct.pack("i", n_dims))
+
+        data = data.astype(np.float32)
+        for i in range(n_dims):
+            f_out.write(struct.pack("i", data.shape[n_dims - i -1]))
+
+        data.tofile(f_out)
+
+print("Done output file: ", 'models/ggml_model.bin'  )
