@@ -34,14 +34,23 @@ shutil.rmtree('temp', ignore_errors=True)
 p = download_file(mnist_url)
 img_loc = unzip_file(p)
 train_root = os.path.join(img_loc, 'training')
+testing_root = os.path.join(img_loc, 'testing')
 
 # get training image files
 
-image_fs = []
+def walk_images(path):
+    acc = []
+    for p, d, fs in os.walk(path):
+        for f in fs:
+            acc.append(os.path.join(p, f))
+    return acc
 
-for p, d, fs in os.walk(train_root):
-    for f in fs:
-        image_fs.append(os.path.join(p, f))
+image_fs = walk_images(train_root)
+testing_fs = walk_images(testing_root)
+
+# for p, d, fs in os.walk(train_root):
+#     for f in fs:
+#         image_fs.append(os.path.join(p, f))
 
 class ImgDataset(Dataset):
     def __init__(self, fs, fold=0, train=True):
@@ -78,6 +87,8 @@ train_dl, val_dl = (
     DataLoader(train_ds, shuffle=True, drop_last=True, batch_size=64), 
     DataLoader(val_ds, shuffle=False, batch_size=64)
 )
+testing_ds = ImgDataset(testing_fs)
+testing_dl = DataLoader(testing_ds, shuffle=True, drop_last=True, batch_size=64)
 
 print(f'dataset length train : {len(train_ds)}, val: {len(val_ds)}')
 print(f'dataloader length train: {len(train_dl)}, val: {len(val_dl)}')
@@ -108,7 +119,21 @@ for _ in range(epochs):
             loss = loss_fn(ys, yb)
             val_loss.append(loss.item())
 
-    print(_, np.mean(train_loss), np.mean(val_loss), np.mean(train_acc), np.mean(val_acc))
+    print(_,
+          "{:.4f}".format(np.mean(train_loss)),
+          "{:.4f}".format(np.mean(val_loss)),
+          "{:.4f}".format(np.mean(train_acc)),
+          "{:.4f}".format(np.mean(val_acc))
+         )
+
+def validate_model(model):
+    with torch.no_grad():
+        for k, (xb, yb) in enumerate(testing_dl):
+            ys = model(xb)
+            acc = (ys.argmax(axis=1) == yb).float().mean()
+            val_acc.append(acc.item())
+    print("{:.4f}".format(np.mean(val_acc)))
+
 
 shutil.rmtree('temp')
 os.makedirs('models', exist_ok=True)
