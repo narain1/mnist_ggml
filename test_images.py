@@ -7,6 +7,8 @@ fname_img = os.path.join('models', 't10k-images.idx3-ubyte')
 
 fimg = open(fname_img, 'rb')
 magic_rn, size, rows, cols = struct.unpack('>IIII', fimg.read(16))
+cell = int(fimg.read(8), 2)
+print(cell)
 #img = np.array("B", fimg.read())
 fimg.close()
 
